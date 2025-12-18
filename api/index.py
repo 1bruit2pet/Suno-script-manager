@@ -56,6 +56,28 @@ app.add_middleware(
 def health_check():
     return {"status": "ok", "message": "Backend is running"}
 
+# Helper function to recursively find the 'clip' or 'song' object in JSON
+def find_clip_in_json(data):
+    if isinstance(data, dict):
+        # Check if this dict looks like a song clip
+        if "metadata" in data and "title" in data and "id" in data:
+            return data
+        
+        # Recursive search in values
+        for key, value in data.items():
+            result = find_clip_in_json(value)
+            if result:
+                return result
+    
+    elif isinstance(data, list):
+        # Recursive search in list
+        for item in data:
+            result = find_clip_in_json(item)
+            if result:
+                return result
+    
+    return None
+
 @app.post("/import-url")
 def import_suno_url(request: ImportRequest):
     try:
@@ -75,49 +97,51 @@ def import_suno_url(request: ImportRequest):
             "tags": ""
         }
 
-        # 1. Title Strategy: OpenGraph -> <title> tag
+        # Strategy 1: OpenGraph (Title/Desc) - Always a good backup
         og_title = soup.find("meta", property="og:title")
         if og_title:
             title_text = og_title.get("content", "")
             data["title"] = title_text.split(" by ")[0].strip()
         
-        if not data["title"]:
-            page_title = soup.title.string if soup.title else ""
-            if " | Suno" in page_title:
-                 data["title"] = page_title.split(" | ")[0].split(" by ")[0].strip()
-            else:
-                 data["title"] = page_title
-
-        # 2. Description Strategy: OpenGraph
-        og_description = soup.find("meta", property="og:description")
-        if og_description:
-            data["style"] = og_description.get("content", "")
-
-        # 3. Deep Dive Strategy: Next.js Data
+        # Strategy 2: Deep Scan of Next.js Data
         next_data = soup.find("script", id="__NEXT_DATA__")
         if next_data:
             try:
                 json_data = json.loads(next_data.string)
-                # Props can be in different places depending on the page type (Song vs Playlist)
-                page_props = json_data.get("props", {}).get("pageProps", {})
                 
-                # Check for 'clip' (Song page)
-                clip = page_props.get("clip")
+                # Use recursive search to find the clip data anywhere
+                clip = find_clip_in_json(json_data)
                 
-                # If it's a shared link, sometimes data is directly in pageProps or under a different key
-                if not clip and "song" in page_props:
-                     clip = page_props.get("song")
-
                 if clip:
                     data["title"] = clip.get("title") or data["title"]
                     metadata = clip.get("metadata", {})
                     data["style"] = metadata.get("tags") or data["style"]
                     data["lyrics"] = metadata.get("prompt") or ""
+                    
+                    # Sometimes tags are separate
+                    if not data["tags"] and data["style"]:
+                         data["tags"] = data["style"] # Use style as tags for now
+
             except Exception as e:
                 print(f"Error parsing NEXT_DATA: {e}")
 
+        # Strategy 3: HTML Fallback (if JSON fails)
+        if not data["lyrics"]:
+             # Try to find lyrics in standard meta description if not found yet
+             og_desc = soup.find("meta", property="og:description")
+             if og_desc:
+                 desc = og_desc.get("content", "")
+                 # If description is long, it might be lyrics. 
+                 # Usually Suno puts "Song made with Suno..."
+                 if "Song made with Suno" not in desc:
+                     # It's likely style or lyrics
+                     if not data["style"]:
+                         data["style"] = desc
+
         if not data["title"]:
-            raise ValueError("Could not find song title. Page might be invalid or private.")
+             # Last resort title
+             if soup.title:
+                 data["title"] = soup.title.string.split(" | ")[0]
 
         return data
 
