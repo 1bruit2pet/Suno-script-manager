@@ -11,6 +11,19 @@ function App() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [toast, setToast] = useState(null); // { message, type: 'success' | 'error' }
+
+  // Auto-hide toast
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+  };
 
   const fetchScripts = async () => {
     try {
@@ -34,14 +47,13 @@ function App() {
     try {
       await scriptService.create(scriptData);
       fetchScripts();
-      setIsFormOpen(false); // Close form on success
+      setIsFormOpen(false);
       setError(null);
+      showToast("Script created successfully! 🎵");
     } catch (err) {
       console.error("Error adding script:", err);
-      // Extract specific error message from backend if available
-      const errorMessage = err.response?.data?.detail || "Failed to add script. Check console for details.";
+      const errorMessage = err.response?.data?.detail || "Failed to add script.";
       setError(errorMessage);
-      // Auto-hide error after 5 seconds
       setTimeout(() => setError(null), 5000);
     }
   };
@@ -51,25 +63,23 @@ function App() {
       await scriptService.update(id, scriptData);
       setEditingScript(null);
       fetchScripts();
+      showToast("Script updated! ✨");
     } catch (err) {
       console.error("Error updating script:", err);
       alert("Failed to update script");
     }
   };
 
-  const handleEditClick = (script) => {
-    setEditingScript(script);
-    setIsFormOpen(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   const handleDeleteScript = async (id) => {
     if (window.confirm("Delete this script permanently?")) {
       try {
         await scriptService.delete(id);
-        fetchScripts();
+        // Optimistic update: remove from list immediately
+        setScripts(prev => prev.filter(s => s.id !== id)); 
+        showToast("Script deleted. 🗑️", "error");
       } catch (err) {
         console.error("Error deleting script:", err);
+        alert("Failed to delete script");
       }
     }
   };
@@ -77,6 +87,22 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-indigo-500/30">
       
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className={`fixed bottom-8 right-8 z-50 px-6 py-3 rounded-xl shadow-2xl font-medium flex items-center gap-3 ${
+              toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'
+            }`}
+          >
+            {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Navbar / Header */}
       <div className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
