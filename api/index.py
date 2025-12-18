@@ -36,11 +36,15 @@ def health_check():
 
 @app.post("/scripts/", response_model=ScriptRead)
 def create_script(script: ScriptCreate, session: Session = Depends(get_session)):
-    db_script = Script.model_validate(script)
-    session.add(db_script)
-    session.commit()
-    session.refresh(db_script)
-    return db_script
+    try:
+        db_script = Script.model_validate(script)
+        session.add(db_script)
+        session.commit()
+        session.refresh(db_script)
+        return db_script
+    except Exception as e:
+        print(f"Error creating script: {e}") # Log for Vercel Console
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
 
 @app.get("/scripts/", response_model=List[ScriptRead])
 def read_scripts(offset: int = 0, limit: int = 100, session: Session = Depends(get_session)):

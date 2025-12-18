@@ -35,9 +35,14 @@ function App() {
       await scriptService.create(scriptData);
       fetchScripts();
       setIsFormOpen(false); // Close form on success
+      setError(null);
     } catch (err) {
       console.error("Error adding script:", err);
-      alert("Failed to add script");
+      // Extract specific error message from backend if available
+      const errorMessage = err.response?.data?.detail || "Failed to add script. Check console for details.";
+      setError(errorMessage);
+      // Auto-hide error after 5 seconds
+      setTimeout(() => setError(null), 5000);
     }
   };
 
