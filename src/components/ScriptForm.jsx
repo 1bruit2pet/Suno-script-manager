@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Save, Wand2 } from 'lucide-react';
+import { X, Save, Wand2, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { scriptService } from '../services/api';
 
 function ScriptForm({ onScriptAdded, editingScript, onUpdateScript, onCancelEdit }) {
   const [formData, setFormData] = React.useState({
@@ -9,6 +10,10 @@ function ScriptForm({ onScriptAdded, editingScript, onUpdateScript, onCancelEdit
     tags: '',
     lyrics: ''
   });
+  
+  const [importUrl, setImportUrl] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState(null);
 
   useEffect(() => {
     if (editingScript) {
@@ -37,6 +42,28 @@ function ScriptForm({ onScriptAdded, editingScript, onUpdateScript, onCancelEdit
     }
     if (!editingScript) {
       setFormData({ title: '', style: '', tags: '', lyrics: '' });
+      setImportUrl('');
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importUrl) return;
+    setIsImporting(true);
+    setImportError(null);
+    try {
+      const data = await scriptService.importFromUrl(importUrl);
+      setFormData(prev => ({
+        ...prev,
+        title: data.title || prev.title,
+        style: data.style || prev.style,
+        lyrics: data.lyrics || prev.lyrics,
+        tags: data.tags || prev.tags
+      }));
+    } catch (err) {
+      console.error("Import failed", err);
+      setImportError("Could not fetch data. Check URL.");
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -57,6 +84,35 @@ function ScriptForm({ onScriptAdded, editingScript, onUpdateScript, onCancelEdit
           </button>
         )}
       </div>
+      
+      {/* Import Section */}
+      {!editingScript && (
+        <div className="px-6 pt-6 pb-2">
+          <div className="flex gap-2">
+            <div className="relative flex-grow">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <LinkIcon size={16} className="text-slate-500" />
+              </div>
+              <input
+                type="text"
+                placeholder="Paste Suno Song URL to auto-fill (e.g. https://suno.com/song/...)"
+                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 p-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+              />
+            </div>
+            <button
+              onClick={handleImport}
+              disabled={isImporting || !importUrl}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isImporting ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
+              Import
+            </button>
+          </div>
+          {importError && <p className="text-red-400 text-xs mt-2 ml-1">{importError}</p>}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         

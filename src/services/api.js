@@ -34,5 +34,10 @@ export const scriptService = {
   delete: async (id) => {
     const response = await api.delete(`${id}`);
     return response.data;
+  },
+
+  importFromUrl: async (url) => {
+    const response = await api.post('/import-url', { url });
+    return response.data;
   }
 };

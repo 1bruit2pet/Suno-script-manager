@@ -11,6 +11,13 @@ from contextlib import asynccontextmanager
 from database import create_db_and_tables, get_session
 from models import Script, ScriptCreate, ScriptRead, ScriptUpdate
 from fastapi.middleware.cors import CORSMiddleware
+import requests
+from bs4 import BeautifulSoup
+import json
+import re
+
+class ImportRequest(SQLModel):
+    url: str
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -48,6 +55,67 @@ app.add_middleware(
 @app.get("/health")
 def health_check():
     return {"status": "ok", "message": "Backend is running"}
+
+@app.post("/import-url")
+def import_suno_url(request: ImportRequest):
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        response = requests.get(request.url, headers=headers)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        data = {
+            "title": "",
+            "style": "",
+            "lyrics": "",
+            "tags": ""
+        }
+
+        # 1. Try OpenGraph tags for basic info
+        og_title = soup.find("meta", property="og:title")
+        if og_title:
+            # Suno titles are often "Song Name by Artist | Suno"
+            title_text = og_title["content"]
+            data["title"] = title_text.split(" by ")[0].strip()
+
+        og_description = soup.find("meta", property="og:description")
+        if og_description:
+            desc = og_description["content"]
+            # Description often contains style/lyrics snippet
+            data["style"] = desc  # Fallback
+
+        # 2. Try to find Next.js hydration data (Suno uses Next.js)
+        # This is where the gold is (full lyrics, clean style)
+        next_data = soup.find("script", id="__NEXT_DATA__")
+        if next_data:
+            try:
+                json_data = json.loads(next_data.string)
+                # Traversing JSON structure is risky as it changes, but let's try generic fallback
+                # Often in props -> pageProps -> clip
+                queries = json_data.get("props", {}).get("pageProps", {})
+                clip = queries.get("clip")
+                
+                if clip:
+                    data["title"] = clip.get("title") or data["title"]
+                    data["style"] = clip.get("metadata", {}).get("tags") or data["style"]
+                    data["lyrics"] = clip.get("metadata", {}).get("prompt") or ""
+            except Exception as e:
+                print(f"Error parsing NEXT_DATA: {e}")
+
+        # 3. Fallback: If lyrics still empty, look for specific generic containers
+        if not data["lyrics"]:
+            # Sometimes lyrics are in a specific div, hard to guess without seeing live DOM
+            # But prompt is often in metadata
+            pass
+
+        return data
+
+    except Exception as e:
+        print(f"Scraping Error: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to fetch Suno data: {str(e)}")
 
 @app.post("/scripts/", response_model=ScriptRead)
 def create_script(script: ScriptCreate, session: Session = Depends(get_session)):
