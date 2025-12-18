@@ -3,7 +3,8 @@ import axios from 'axios';
 import ScriptForm from './components/ScriptForm';
 import ScriptList from './components/ScriptList';
 
-const API_URL = 'http://localhost:8000/scripts/';
+// Use relative path '/api' which will be handled by Vercel rewrites or Vite proxy
+const API_URL = '/api/scripts/';
 
 function App() {
   const [scripts, setScripts] = useState([]);

@@ -5,17 +5,21 @@ from contextlib import asynccontextmanager
 from database import create_db_and_tables, get_session
 from models import Script, ScriptCreate, ScriptRead, ScriptUpdate
 from fastapi.middleware.cors import CORSMiddleware
+import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
     yield
 
-app = FastAPI(lifespan=lifespan)
+# Configuration pour Vercel : on définit le root_path si on passe par /api
+app = FastAPI(lifespan=lifespan, root_path="/api")
 
 origins = [
-    "http://localhost:5173", # Vite default
+    "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://suno-script-manager.vercel.app", # Exemple
+    "*" # Autoriser tout pour faciliter le débug initial (à restreindre en prod idéalement)
 ]
 
 app.add_middleware(

@@ -1,10 +1,21 @@
+import os
 from sqlmodel import SQLModel, create_engine, Session
 
 sqlite_file_name = "database.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"
 
-connect_args = {"check_same_thread": False}
-engine = create_engine(sqlite_url, echo=True, connect_args=connect_args)
+# Récupération de l'URL de base de données depuis l'environnement (Vercel)
+database_url = os.environ.get("DATABASE_URL")
+
+# Si on est sur Vercel, l'URL commence souvent par postgres:// mais SQLAlchemy veut postgresql://
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+# Utilisation de Postgres si dispo (Prod), sinon SQLite (Local)
+engine_url = database_url if database_url else sqlite_url
+connect_args = {"check_same_thread": False} if not database_url else {}
+
+engine = create_engine(engine_url, echo=True, connect_args=connect_args)
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
