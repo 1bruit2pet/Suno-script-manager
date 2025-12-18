@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Save, Wand2, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { X, Save, Wand2, Link as LinkIcon, Loader2, Edit2 } from 'lucide-react';
 import { scriptService } from '../services/api';
 
 function ScriptForm({ onScriptAdded, editingScript, onUpdateScript, onCancelEdit }) {
