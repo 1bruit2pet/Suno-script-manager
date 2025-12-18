@@ -1,102 +1,136 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { X, Save, Wand2 } from 'lucide-react';
 
 function ScriptForm({ onScriptAdded, editingScript, onUpdateScript, onCancelEdit }) {
-  const [title, setTitle] = React.useState('');
-  const [lyrics, setLyrics] = React.useState('');
-  const [style, setStyle] = React.useState('');
-  const [tags, setTags] = React.useState('');
+  const [formData, setFormData] = React.useState({
+    title: '',
+    style: '',
+    tags: '',
+    lyrics: ''
+  });
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (editingScript) {
-      setTitle(editingScript.title);
-      setLyrics(editingScript.lyrics);
-      setStyle(editingScript.style || '');
-      setTags(editingScript.tags || '');
+      setFormData({
+        title: editingScript.title,
+        style: editingScript.style || '',
+        tags: editingScript.tags || '',
+        lyrics: editingScript.lyrics
+      });
     } else {
-      setTitle('');
-      setLyrics('');
-      setStyle('');
-      setTags('');
+      setFormData({ title: '', style: '', tags: '', lyrics: '' });
     }
   }, [editingScript]);
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    const scriptData = { title, lyrics, style, tags };
     if (editingScript) {
-      onUpdateScript(editingScript.id, scriptData);
+      onUpdateScript(editingScript.id, formData);
     } else {
-      onScriptAdded(scriptData);
+      onScriptAdded(formData);
     }
-    // Reset form
-    setTitle('');
-    setLyrics('');
-    setStyle('');
-    setTags('');
+    if (!editingScript) {
+      setFormData({ title: '', style: '', tags: '', lyrics: '' });
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md mb-8">
-      <h2 className="text-xl font-bold mb-4">{editingScript ? 'Edit Script' : 'Add New Script'}</h2>
-      <div className="grid grid-cols-1 gap-4">
-        <div>
-          <label className="block text-gray-700 font-bold mb-2">Title</label>
-          <input
-            type="text"
-            className="w-full border p-2 rounded"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-gray-700 font-bold mb-2">Style</label>
-          <input
-            type="text"
-            className="w-full border p-2 rounded"
-            value={style}
-            onChange={(e) => setStyle(e.target.value)}
-            placeholder="e.g., Electronic, Jazz"
-          />
-        </div>
-        <div>
-          <label className="block text-gray-700 font-bold mb-2">Tags</label>
-          <input
-            type="text"
-            className="w-full border p-2 rounded"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="Comma separated"
-          />
-        </div>
-        <div>
-          <label className="block text-gray-700 font-bold mb-2">Lyrics / Prompt</label>
-          <textarea
-            className="w-full border p-2 rounded h-32"
-            value={lyrics}
-            onChange={(e) => setLyrics(e.target.value)}
-            required
-          />
-        </div>
-      </div>
-      <div className="mt-4 flex gap-2">
-        <button
-          type="submit"
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-        >
-          {editingScript ? 'Update' : 'Save'}
-        </button>
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden mb-10"
+    >
+      <div className="p-6 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center">
+        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          {editingScript ? <Edit2 className="text-indigo-400" size={20}/> : <Wand2 className="text-indigo-400" size={20}/>}
+          {editingScript ? 'Edit Script' : 'Create New Script'}
+        </h2>
         {editingScript && (
-          <button
-            type="button"
-            onClick={onCancelEdit}
-            className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
-          >
-            Cancel
+          <button onClick={onCancelEdit} className="text-slate-400 hover:text-white transition-colors">
+            <X size={24} />
           </button>
         )}
       </div>
-    </form>
+
+      <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Left Column: Metadata */}
+        <div className="lg:col-span-1 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Title</label>
+            <input
+              type="text"
+              name="title"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              placeholder="e.g. Neon City Nights"
+              value={formData.title}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Musical Style</label>
+            <input
+              type="text"
+              name="style"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              placeholder="e.g. Synthwave, 120 BPM"
+              value={formData.style}
+              onChange={handleChange}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tags</label>
+            <input
+              type="text"
+              name="tags"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              placeholder="e.g. Melancholic, Upbeat"
+              value={formData.tags}
+              onChange={handleChange}
+            />
+          </div>
+        </div>
+
+        {/* Right Column: Lyrics/Prompt */}
+        <div className="lg:col-span-2 flex flex-col">
+          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Lyrics & Structure</label>
+          <textarea
+            name="lyrics"
+            className="flex-grow min-h-[250px] w-full bg-slate-900 border border-slate-700 rounded-lg p-4 text-slate-200 font-mono text-sm leading-relaxed placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none"
+            placeholder="[Verse 1]&#10;Enter your lyrics here..."
+            value={formData.lyrics}
+            onChange={handleChange}
+            required
+          />
+          <div className="flex justify-end pt-4 gap-3">
+            {editingScript && (
+              <button
+                type="button"
+                onClick={onCancelEdit}
+                className="px-6 py-2.5 rounded-lg font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-all"
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              type="submit"
+              className="flex items-center gap-2 px-8 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 transform hover:-translate-y-0.5 transition-all"
+            >
+              <Save size={18} />
+              {editingScript ? 'Save Changes' : 'Save Script'}
+            </button>
+          </div>
+        </div>
+
+      </form>
+    </motion.div>
   );
 }
 
