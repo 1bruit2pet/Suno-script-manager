@@ -72,6 +72,12 @@ function App() {
     }
   };
 
+  const handleEditClick = (script) => {
+    setEditingScript(script);
+    setIsFormOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleDeleteScript = async (id) => {
     if (window.confirm("Delete this script permanently?")) {
       try {
