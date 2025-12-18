@@ -146,31 +146,14 @@ def import_suno_url(request: ImportRequest):
                  data["style"] = max(valid_tags, key=len).encode().decode('unicode_escape')
 
         # Fallback: HTML Metadata Description
+        og_desc = soup.find("meta", property="og:description")
         if not data["lyrics"]:
-             og_desc = soup.find("meta", property="og:description")
              if og_desc:
                  desc = og_desc.get("content", "")
                  if "Song made with Suno" not in desc and len(desc) > 50:
                      data["lyrics"] = desc # Sometimes lyrics are here
 
         if not data["title"]:
-             if soup.title:
-                 data["title"] = soup.title.string.split(" | ")[0]
-
-        return data
-
-    except requests.exceptions.HTTPError as e:
-             if og_desc:
-                 desc = og_desc.get("content", "")
-                 # If description is long, it might be lyrics. 
-                 # Usually Suno puts "Song made with Suno..."
-                 if "Song made with Suno" not in desc:
-                     # It's likely style or lyrics
-                     if not data["style"]:
-                         data["style"] = desc
-
-        if not data["title"]:
-             # Last resort title
              if soup.title:
                  data["title"] = soup.title.string.split(" | ")[0]
 
