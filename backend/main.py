@@ -30,6 +30,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "message": "Backend is running"}
+
 @app.post("/scripts/", response_model=ScriptRead)
 def create_script(script: ScriptCreate, session: Session = Depends(get_session)):
     db_script = Script.model_validate(script)

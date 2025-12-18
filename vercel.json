@@ -18,15 +18,7 @@
       "destination": "/backend/main.py"
     },
     {
-      "source": "/assets/(.*)",
-      "destination": "/assets/$1"
-    },
-    {
-      "source": "/vite.svg",
-      "destination": "/vite.svg"
-    },
-    {
-      "source": "/((?!api/|assets/|vite.svg|favicon.ico).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
