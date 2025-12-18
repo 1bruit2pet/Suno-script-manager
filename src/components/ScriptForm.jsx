@@ -61,7 +61,9 @@ function ScriptForm({ onScriptAdded, editingScript, onUpdateScript, onCancelEdit
       }));
     } catch (err) {
       console.error("Import failed", err);
-      setImportError("Could not fetch data. Check URL.");
+      // Afficher le message d'erreur précis du backend
+      const errorMessage = err.response?.data?.detail || "Could not fetch data. Check URL.";
+      setImportError(errorMessage);
     } finally {
       setIsImporting(false);
     }

@@ -62,7 +62,8 @@ def import_suno_url(request: ImportRequest):
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
-        response = requests.get(request.url, headers=headers)
+        # Allow redirects (Suno uses /s/ -> /song/ redirects)
+        response = requests.get(request.url, headers=headers, allow_redirects=True)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -74,48 +75,59 @@ def import_suno_url(request: ImportRequest):
             "tags": ""
         }
 
-        # 1. Try OpenGraph tags for basic info
+        # 1. Title Strategy: OpenGraph -> <title> tag
         og_title = soup.find("meta", property="og:title")
         if og_title:
-            # Suno titles are often "Song Name by Artist | Suno"
-            title_text = og_title["content"]
+            title_text = og_title.get("content", "")
             data["title"] = title_text.split(" by ")[0].strip()
+        
+        if not data["title"]:
+            page_title = soup.title.string if soup.title else ""
+            if " | Suno" in page_title:
+                 data["title"] = page_title.split(" | ")[0].split(" by ")[0].strip()
+            else:
+                 data["title"] = page_title
 
+        # 2. Description Strategy: OpenGraph
         og_description = soup.find("meta", property="og:description")
         if og_description:
-            desc = og_description["content"]
-            # Description often contains style/lyrics snippet
-            data["style"] = desc  # Fallback
+            data["style"] = og_description.get("content", "")
 
-        # 2. Try to find Next.js hydration data (Suno uses Next.js)
-        # This is where the gold is (full lyrics, clean style)
+        # 3. Deep Dive Strategy: Next.js Data
         next_data = soup.find("script", id="__NEXT_DATA__")
         if next_data:
             try:
                 json_data = json.loads(next_data.string)
-                # Traversing JSON structure is risky as it changes, but let's try generic fallback
-                # Often in props -> pageProps -> clip
-                queries = json_data.get("props", {}).get("pageProps", {})
-                clip = queries.get("clip")
+                # Props can be in different places depending on the page type (Song vs Playlist)
+                page_props = json_data.get("props", {}).get("pageProps", {})
                 
+                # Check for 'clip' (Song page)
+                clip = page_props.get("clip")
+                
+                # If it's a shared link, sometimes data is directly in pageProps or under a different key
+                if not clip and "song" in page_props:
+                     clip = page_props.get("song")
+
                 if clip:
                     data["title"] = clip.get("title") or data["title"]
-                    data["style"] = clip.get("metadata", {}).get("tags") or data["style"]
-                    data["lyrics"] = clip.get("metadata", {}).get("prompt") or ""
+                    metadata = clip.get("metadata", {})
+                    data["style"] = metadata.get("tags") or data["style"]
+                    data["lyrics"] = metadata.get("prompt") or ""
             except Exception as e:
                 print(f"Error parsing NEXT_DATA: {e}")
 
-        # 3. Fallback: If lyrics still empty, look for specific generic containers
-        if not data["lyrics"]:
-            # Sometimes lyrics are in a specific div, hard to guess without seeing live DOM
-            # But prompt is often in metadata
-            pass
+        if not data["title"]:
+            raise ValueError("Could not find song title. Page might be invalid or private.")
 
         return data
 
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="Suno song not found. Check the URL.")
+        raise HTTPException(status_code=400, detail=f"Suno connection error: {str(e)}")
     except Exception as e:
         print(f"Scraping Error: {e}")
-        raise HTTPException(status_code=400, detail=f"Failed to fetch Suno data: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to analyze page: {str(e)}")
 
 @app.post("/scripts/", response_model=ScriptRead)
 def create_script(script: ScriptCreate, session: Session = Depends(get_session)):
