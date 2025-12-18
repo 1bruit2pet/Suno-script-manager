@@ -3,10 +3,12 @@ import { Plus, Disc, LayoutGrid } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ScriptForm from './components/ScriptForm';
 import ScriptList from './components/ScriptList';
+import SearchBar from './components/SearchBar';
 import { scriptService } from './services/api';
 
 function App() {
   const [scripts, setScripts] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [editingScript, setEditingScript] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -84,6 +86,17 @@ function App() {
     }
   };
 
+  const filteredScripts = scripts.filter(script => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      script.title?.toLowerCase().includes(q) ||
+      script.style?.toLowerCase().includes(q) ||
+      script.tags?.toLowerCase().includes(q) ||
+      script.lyrics?.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-indigo-500/30">
       
@@ -110,7 +123,7 @@ function App() {
             <div className="bg-indigo-600 p-2 rounded-xl shadow-lg shadow-indigo-500/20">
               <Disc size={24} className="text-white animate-spin-slow" />
             </div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent hidden sm:block">
               Suno Manager
             </h1>
           </div>
@@ -160,6 +173,8 @@ function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
+              <SearchBar value={searchQuery} onChange={setSearchQuery} />
+
               {loading ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {[1, 2, 3].map((i) => (
@@ -168,7 +183,7 @@ function App() {
                 </div>
               ) : (
                 <ScriptList 
-                  scripts={scripts} 
+                  scripts={filteredScripts} 
                   onDelete={handleDeleteScript} 
                   onEdit={handleEditClick}
                 />
