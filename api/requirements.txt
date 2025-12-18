@@ -2,5 +2,6 @@ fastapi
 uvicorn
 sqlmodel
 pytest
+pytest-cov
 httpx
 psycopg2-binary

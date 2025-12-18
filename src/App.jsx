@@ -1,21 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import ScriptForm from './components/ScriptForm';
 import ScriptList from './components/ScriptList';
-
-// Use relative path '/api' which will be handled by Vercel rewrites or Vite proxy
-const API_URL = '/api/scripts/';
+import { scriptService } from './services/api';
 
 function App() {
   const [scripts, setScripts] = useState([]);
   const [editingScript, setEditingScript] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const fetchScripts = async () => {
     try {
-      const response = await axios.get(API_URL);
-      setScripts(response.data);
-    } catch (error) {
-      console.error("Error fetching scripts:", error);
+      setLoading(true);
+      const data = await scriptService.getAll();
+      setScripts(data);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching scripts:", err);
+      setError("Failed to load scripts. Check if the backend is running.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -25,30 +29,33 @@ function App() {
 
   const handleAddScript = async (scriptData) => {
     try {
-      await axios.post(API_URL, scriptData);
+      await scriptService.create(scriptData);
       fetchScripts();
-    } catch (error) {
-      console.error("Error adding script:", error);
+    } catch (err) {
+      console.error("Error adding script:", err);
+      alert("Failed to add script");
     }
   };
 
   const handleUpdateScript = async (id, scriptData) => {
     try {
-      await axios.patch(`${API_URL}${id}`, scriptData);
+      await scriptService.update(id, scriptData);
       setEditingScript(null);
       fetchScripts();
-    } catch (error) {
-      console.error("Error updating script:", error);
+    } catch (err) {
+      console.error("Error updating script:", err);
+      alert("Failed to update script");
     }
   };
 
   const handleDeleteScript = async (id) => {
     if (window.confirm("Are you sure you want to delete this script?")) {
       try {
-        await axios.delete(`${API_URL}${id}`);
+        await scriptService.delete(id);
         fetchScripts();
-      } catch (error) {
-        console.error("Error deleting script:", error);
+      } catch (err) {
+        console.error("Error deleting script:", err);
+        alert("Failed to delete script");
       }
     }
   };
@@ -58,6 +65,12 @@ function App() {
       <div className="max-w-6xl mx-auto">
         <h1 className="text-4xl font-extrabold text-gray-800 mb-8 text-center">Suno Script Manager</h1>
         
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-center">
+            {error}
+          </div>
+        )}
+
         <ScriptForm 
           onScriptAdded={handleAddScript} 
           editingScript={editingScript}
@@ -67,11 +80,15 @@ function App() {
         
         <div className="border-t border-gray-300 my-8"></div>
         
-        <ScriptList 
-          scripts={scripts} 
-          onDelete={handleDeleteScript} 
-          onEdit={setEditingScript}
-        />
+        {loading ? (
+          <p className="text-center text-gray-500">Loading scripts...</p>
+        ) : (
+          <ScriptList 
+            scripts={scripts} 
+            onDelete={handleDeleteScript} 
+            onEdit={setEditingScript}
+          />
+        )}
       </div>
     </div>
   );
