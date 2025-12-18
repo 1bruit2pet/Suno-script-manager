@@ -5,7 +5,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI, HTTPException, Depends
-from sqlmodel import Session, select
+from sqlmodel import Session, select, SQLModel # SQLModel added here
 from typing import List
 from contextlib import asynccontextmanager
 from database import create_db_and_tables, get_session
