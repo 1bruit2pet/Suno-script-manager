@@ -18,8 +18,13 @@ async def lifespan(app: FastAPI):
         create_db_and_tables()
         print("Database initialized successfully.")
     except Exception as e:
-        print(f"CRITICAL STARTUP ERROR: Failed to initialize database: {e}")
-        # On ne raise pas l'erreur pour laisser l'app démarrer et voir les logs
+        # Si l'erreur mentionne que la relation existe déjà, on ignore, c'est bon signe.
+        error_str = str(e).lower()
+        if "already exists" in error_str or "uniqueviolation" in error_str:
+            print(f"Database schema already exists, skipping creation. (Error: {e})")
+        else:
+            print(f"WARNING: Database initialization failed: {e}")
+            # On continue quand même pour que l'API /health fonctionne
     yield
 
 # Configuration pour Vercel : on définit le root_path si on passe par /api
