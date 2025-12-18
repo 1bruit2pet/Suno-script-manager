@@ -14,7 +14,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    create_db_and_tables()
+    try:
+        create_db_and_tables()
+        print("Database initialized successfully.")
+    except Exception as e:
+        print(f"CRITICAL STARTUP ERROR: Failed to initialize database: {e}")
+        # On ne raise pas l'erreur pour laisser l'app démarrer et voir les logs
     yield
 
 # Configuration pour Vercel : on définit le root_path si on passe par /api
