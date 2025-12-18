@@ -125,7 +125,29 @@ def import_suno_url(request: ImportRequest):
             except Exception as e:
                 print(f"Error parsing NEXT_DATA: {e}")
 
-        # Strategy 3: HTML Fallback (if JSON fails)
+        # Strategy 3: Regex Fallback (Next.js App Router / Streaming)
+        # Often data is in self.__next_f.push(...) as escaped strings
+        if not data["lyrics"]:
+            try:
+                # Search for "prompt":"..." pattern
+                # Using a robust regex that handles escaped quotes
+                prompt_matches = re.findall(r'"prompt":"(.*?)(?<!\\)"', response.text)
+                if prompt_matches:
+                    # Take the longest match, usually the full lyrics
+                    longest_prompt = max(prompt_matches, key=len)
+                    # Unescape unicode and newlines
+                    data["lyrics"] = longest_prompt.encode().decode('unicode_escape').replace(r'\n', '\n')
+
+                # Search for "tags":"..."
+                if not data["style"]:
+                    tags_matches = re.findall(r'"tags":"(.*?)(?<!\\)"', response.text)
+                    if tags_matches:
+                         data["style"] = tags_matches[0].encode().decode('unicode_escape')
+
+            except Exception as e:
+                print(f"Regex Fallback Error: {e}")
+
+        # Strategy 4: HTML Fallback (if JSON fails)
         if not data["lyrics"]:
              # Try to find lyrics in standard meta description if not found yet
              og_desc = soup.find("meta", property="og:description")
