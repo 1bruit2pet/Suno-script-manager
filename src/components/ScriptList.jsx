@@ -26,7 +26,7 @@ function ScriptList({ scripts, onDelete, onEdit }) {
             {/* Header */}
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-xl font-bold text-slate-100 truncate pr-4">{script.title}</h3>
-              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <div className="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200">
                 <button
                   onClick={() => onEdit(script)}
                   className="p-2 bg-slate-700 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-slate-600 transition-colors"
