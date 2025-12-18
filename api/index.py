@@ -81,11 +81,21 @@ def find_clip_in_json(data):
 @app.post("/import-url")
 def import_suno_url(request: ImportRequest):
     try:
+        # Use a very standard, recent browser User-Agent to avoid bot detection
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://suno.com/",
         }
-        # Allow redirects (Suno uses /s/ -> /song/ redirects)
+        
+        # Allow redirects
         response = requests.get(request.url, headers=headers, allow_redirects=True)
+        print(f"Suno Status Code: {response.status_code}") # Debug
+        
+        if response.status_code == 403:
+             raise HTTPException(status_code=403, detail="Suno blocked the request (Anti-bot). Try manually for now.")
+        
         response.raise_for_status()
         
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -97,60 +107,59 @@ def import_suno_url(request: ImportRequest):
             "tags": ""
         }
 
-        # Strategy 1: OpenGraph (Title/Desc) - Always a good backup
+        # Strategy 1: OpenGraph (Title/Desc)
         og_title = soup.find("meta", property="og:title")
         if og_title:
             title_text = og_title.get("content", "")
             data["title"] = title_text.split(" by ")[0].strip()
         
-        # Strategy 2: Deep Scan of Next.js Data
-        next_data = soup.find("script", id="__NEXT_DATA__")
-        if next_data:
-            try:
-                json_data = json.loads(next_data.string)
-                
-                # Use recursive search to find the clip data anywhere
-                clip = find_clip_in_json(json_data)
-                
-                if clip:
-                    data["title"] = clip.get("title") or data["title"]
-                    metadata = clip.get("metadata", {})
-                    data["style"] = metadata.get("tags") or data["style"]
-                    data["lyrics"] = metadata.get("prompt") or ""
-                    
-                    # Sometimes tags are separate
-                    if not data["tags"] and data["style"]:
-                         data["tags"] = data["style"] # Use style as tags for now
+        # Strategy 2: Regex Brutal V2 (The "Loose" Match)
+        # We look for "prompt": "..." but we allow ANY character in between, handling escaped quotes
+        text_content = response.text
+        
+        # Capture lyrics (prompt)
+        # Pattern: "prompt":"(content...)" 
+        # We use a non-greedy match that stops at the next "," or "}" 
+        # But lyrics can contain escaped quotes \", so we need to be careful.
+        # Let's try matching a large chunk of text that looks like lyrics.
+        
+        # Try to find the exact song ID first to narrow down the search
+        song_id = request.url.split("/")[-1]
+        
+        # Find the block containing the ID, then look for prompt nearby
+        # This is complex with Regex. Let's stick to finding "prompt" keys.
+        
+        prompts = re.findall(r'"prompt"\s*:\s*"(.*?)(?<!\\)"', text_content)
+        if prompts:
+            # Sort by length, lyrics are usually the longest prompt string in the page
+            longest = max(prompts, key=len)
+            if len(longest) > 20: # Arbitrary threshold to ignore empty prompts
+                data["lyrics"] = longest.encode().decode('unicode_escape').replace(r'\n', '\n')
 
-            except Exception as e:
-                print(f"Error parsing NEXT_DATA: {e}")
+        # Capture tags/style
+        tags = re.findall(r'"tags"\s*:\s*"(.*?)(?<!\\)"', text_content)
+        if tags:
+             # Find non-empty tags
+             valid_tags = [t for t in tags if t.strip()]
+             if valid_tags:
+                 # Prefer the one closest to the prompt if possible, otherwise longest
+                 data["style"] = max(valid_tags, key=len).encode().decode('unicode_escape')
 
-        # Strategy 3: Regex Fallback (Next.js App Router / Streaming)
-        # Often data is in self.__next_f.push(...) as escaped strings
+        # Fallback: HTML Metadata Description
         if not data["lyrics"]:
-            try:
-                # Search for "prompt":"..." pattern
-                # Using a robust regex that handles escaped quotes
-                prompt_matches = re.findall(r'"prompt":"(.*?)(?<!\\)"', response.text)
-                if prompt_matches:
-                    # Take the longest match, usually the full lyrics
-                    longest_prompt = max(prompt_matches, key=len)
-                    # Unescape unicode and newlines
-                    data["lyrics"] = longest_prompt.encode().decode('unicode_escape').replace(r'\n', '\n')
-
-                # Search for "tags":"..."
-                if not data["style"]:
-                    tags_matches = re.findall(r'"tags":"(.*?)(?<!\\)"', response.text)
-                    if tags_matches:
-                         data["style"] = tags_matches[0].encode().decode('unicode_escape')
-
-            except Exception as e:
-                print(f"Regex Fallback Error: {e}")
-
-        # Strategy 4: HTML Fallback (if JSON fails)
-        if not data["lyrics"]:
-             # Try to find lyrics in standard meta description if not found yet
              og_desc = soup.find("meta", property="og:description")
+             if og_desc:
+                 desc = og_desc.get("content", "")
+                 if "Song made with Suno" not in desc and len(desc) > 50:
+                     data["lyrics"] = desc # Sometimes lyrics are here
+
+        if not data["title"]:
+             if soup.title:
+                 data["title"] = soup.title.string.split(" | ")[0]
+
+        return data
+
+    except requests.exceptions.HTTPError as e:
              if og_desc:
                  desc = og_desc.get("content", "")
                  # If description is long, it might be lyrics. 
