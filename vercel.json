@@ -18,8 +18,16 @@
       "destination": "/backend/main.py"
     },
     {
-      "source": "/(.*)",
-      "destination": "/frontend/index.html"
+      "source": "/assets/(.*)",
+      "destination": "/assets/$1"
+    },
+    {
+      "source": "/vite.svg",
+      "destination": "/vite.svg"
+    },
+    {
+      "source": "/((?!api/|assets/|vite.svg|favicon.ico).*)",
+      "destination": "/index.html"
     }
   ]
 }
